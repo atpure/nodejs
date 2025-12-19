@@ -1,46 +1,46 @@
-const express = require('express');
-const net = require('net');
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
 const path = require('path');
 
-const app = express();
 const PORT = 3000;
-const TARGET_IP = '192.168.0.10';
-const TARGET_PORT = 22;
 
-app.use(express.static('public'));
-
-app.get('/check-ssh', (req, res) => {
-    const socket = new net.Socket();
-    let status = 'Off';
-
-    socket.setTimeout(2000); // 2초 타임아웃
-
-    socket.on('connect', () => {
-        status = 'On';
-        socket.destroy();
-    });
-
-    socket.on('timeout', () => {
-        status = 'Off';
-        socket.destroy();
-    });
-
-    socket.on('error', (err) => {
-        status = 'Off';
-        socket.destroy();
-    });
-
-    socket.on('close', () => {
-        res.json({ status });
-    });
-
-    socket.connect(TARGET_PORT, TARGET_IP);
+const server = http.createServer((req, res) => {
+    if (req.url === '/') {
+        fs.readFile(path.join(__dirname, 'public', 'index.html'), (err, data) => {
+            if (err) {
+                res.writeHead(500);
+                return res.end('Error loading index.html');
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(data);
+        });
+    } else if (req.url === '/api/bitcoin-price') {
+        const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,krw';
+        
+        https.get(url, (apiRes) => {
+            let data = '';
+            apiRes.on('data', (chunk) => { data += chunk; });
+            apiRes.on('end', () => {
+                try {
+                    const priceData = JSON.parse(data);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, bitcoin: priceData.bitcoin }));
+                } catch (e) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ success: false, error: 'Parse Error' }));
+                }
+            });
+        }).on('error', (err) => {
+            res.writeHead(500);
+            res.end(JSON.stringify({ success: false, error: err.message }));
+        });
+    } else {
+        res.writeHead(404);
+        res.end('Not Found');
+    }
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });

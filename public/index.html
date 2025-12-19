@@ -3,70 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SSH Status Checker</title>
+    <title>Bitcoin Tracker (KRW)</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
-            background-color: #f0f2f5;
-        }
-        .container {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        h1 {
+            background-color: #f4f7f6;
             color: #333;
         }
-        #status {
-            font-size: 3rem;
+        .card {
+            background: white;
+            padding: 3rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 400px;
+        }
+        .logo {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+        }
+        h1 {
+            margin: 0.5rem 0;
+            font-size: 1.5rem;
+            color: #555;
+        }
+        .price-krw {
+            font-size: 2.5rem;
             font-weight: bold;
-            margin: 1rem 0;
+            color: #f7931a; /* Bitcoin Orange */
+            margin: 1.5rem 0;
         }
-        .on {
-            color: #28a745;
+        .price-usd {
+            font-size: 1.2rem;
+            color: #777;
+            margin-bottom: 1rem;
         }
-        .off {
-            color: #dc3545;
+        .updated-at {
+            font-size: 0.8rem;
+            color: #aaa;
         }
-        .loading {
-            color: #6c757d;
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #f7931a;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            display: inline-block;
+            margin: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>SSH Status (192.168.0.10)</h1>
-        <div id="status" class="loading">Checking...</div>
-        <p>SSH 포트(22) 접속 가능 여부를 확인 중입니다.</p>
+    <div class="card">
+        <svg class="logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="32" cy="32" r="32" fill="#f7931a"/>
+            <path d="M46.103 27.281c.63-4.212-2.58-6.476-6.963-7.988l1.427-5.72-3.483-.867-1.39 5.575c-.914-.228-1.85-.443-2.774-.658l1.398-5.601-3.486-.867-1.427 5.72c-.76-.172-1.503-.341-2.234-.515l.004-.017-4.807-1.199-.928 3.725s2.587.592 2.532.628c1.412.353 1.666 1.288 1.625 2.031l-1.627 6.526c.097.024.224.06.363.114-.116-.029-.241-.059-.367-.091l-2.28 9.143c-.173.428-.611 1.071-1.597.826.035.05-2.533-.632-2.533-.632l-1.731 3.991 4.536 1.131c.843.21 1.669.429 2.482.637l-1.442 5.79 3.488.87 1.427-5.72c.953.259 1.884.5 2.793.73l-1.423 5.703 3.488.87 1.439-5.766c5.95 1.127 10.422.673 12.302-4.706 1.515-4.329-.075-6.829-3.197-8.47 2.275-.526 3.991-2.023 4.453-5.115zm-7.971 11.218c-1.077 4.331-8.371 1.991-10.732 1.405l1.916-7.676c2.36.588 9.943 1.751 8.816 6.271zm1.08-11.272c-.98 3.935-7.062 1.935-9.028 1.446l1.738-6.966c1.964.489 8.309 1.402 7.29 5.52z" fill="#fff"/>
+        </svg>
+        <h1>비트코인 실시간 시세</h1>
+        <div id="price-container">
+            <div class="loading-spinner"></div>
+            <p>정보를 가져오는 중...</p>
+        </div>
+        <p class="updated-at" id="update-time"></p>
     </div>
 
     <script>
-        async function checkStatus() {
-            const statusElement = document.getElementById('status');
+        async function updatePrice() {
+            const container = document.getElementById('price-container');
+            const timeElement = document.getElementById('update-time');
+
             try {
-                const response = await fetch('/check-ssh');
+                const response = await fetch('/api/bitcoin-price');
                 const data = await response.json();
-                
-                statusElement.textContent = data.status;
-                statusElement.className = data.status.toLowerCase();
+
+                if (data.success) {
+                    const priceKrw = data.bitcoin.krw.toLocaleString('ko-KR');
+                    const priceUsd = data.bitcoin.usd.toLocaleString('en-US');
+
+                    container.innerHTML = `
+                        <div class="price-krw">₩ ${priceKrw}</div>
+                        <div class="price-usd">$ ${priceUsd}</div>
+                    `;
+                    
+                    const now = new Date();
+                    timeElement.textContent = `최근 업데이트: ${now.toLocaleTimeString()}`;
+                } else {
+                    throw new Error('API Error');
+                }
             } catch (error) {
-                statusElement.textContent = 'Error';
-                statusElement.className = 'off';
+                container.innerHTML = `<p style="color:red">데이터를 불러오지 못했습니다.</p>`;
             }
         }
 
-        // 페이지 로드 시 확인
-        checkStatus();
-        // 10초마다 갱신
-        setInterval(checkStatus, 10000);
+        updatePrice();
+        setInterval(updatePrice, 60000); // 1분마다 갱신
     </script>
 </body>
 </html>
