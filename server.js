@@ -15,8 +15,8 @@ const server = http.createServer((req, res) => {
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
             res.end(data);
         });
-    } else if (req.url === '/api/bitcoin-price') {
-        const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,krw';
+    } else if (req.url === '/api/crypto-prices') {
+        const url = 'https://api.upbit.com/v1/ticker?markets=KRW-BTC,KRW-XRP';
         
         https.get(url, (apiRes) => {
             let data = '';
@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
                 try {
                     const priceData = JSON.parse(data);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true, bitcoin: priceData.bitcoin }));
+                    res.end(JSON.stringify(priceData));
                 } catch (e) {
                     res.writeHead(500);
                     res.end(JSON.stringify({ success: false, error: 'Parse Error' }));
