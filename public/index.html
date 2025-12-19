@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSH Status Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        #status {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 1rem 0;
+        }
+        .on {
+            color: #28a745;
+        }
+        .off {
+            color: #dc3545;
+        }
+        .loading {
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SSH Status (192.168.0.10)</h1>
+        <div id="status" class="loading">Checking...</div>
+        <p>SSH 포트(22) 접속 가능 여부를 확인 중입니다.</p>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            const statusElement = document.getElementById('status');
+            try {
+                const response = await fetch('/check-ssh');
+                const data = await response.json();
+                
+                statusElement.textContent = data.status;
+                statusElement.className = data.status.toLowerCase();
+            } catch (error) {
+                statusElement.textContent = 'Error';
+                statusElement.className = 'off';
+            }
+        }
+
+        // 페이지 로드 시 확인
+        checkStatus();
+        // 10초마다 갱신
+        setInterval(checkStatus, 10000);
+    </script>
+</body>
+</html>
