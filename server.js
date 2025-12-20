@@ -121,7 +121,7 @@ const server = http.createServer((req, res) => {
                 return res.end(JSON.stringify({ success: false, error: 'MongoDB not connected' }));
             }
             
-            timeRecordsCollection.find({}).sort({ timestamp: -1 }).limit(10).toArray((err, records) => {
+            timeRecordsCollection.find({}).sort({ timestamp: 1 }).toArray((err, records) => {
                 if (err) {
                     console.error('TimeRecord 조회 실패:', err);
                     res.writeHead(500);

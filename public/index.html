@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crypto Tracker (KRW)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
+            padding: 20px;
+            min-height: 100vh;
             margin: 0;
             background-color: #f4f7f6;
             color: #333;
@@ -158,6 +159,30 @@
         .refresh-btn:hover {
             background: #e8850f;
         }
+        .chart-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+            margin-top: 30px;
+            text-align: center;
+        }
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 20px;
+            text-align: center;
+            border-bottom: 2px solid #f7931a;
+            padding-bottom: 10px;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -179,6 +204,13 @@
             <div id="timeRecordsList">
                 <div class="no-records">데이터를 불러오는 중...</div>
             </div>
+        </div>
+    </div>
+
+    <div class="chart-section">
+        <div class="chart-title">국채 금리 변동 그래프</div>
+        <div class="chart-container">
+            <canvas id="bondYieldChart"></canvas>
         </div>
     </div>
 
@@ -282,7 +314,9 @@
                     if (result.records.length === 0) {
                         listContainer.innerHTML = '<div class="no-records">저장된 기록이 없습니다</div>';
                     } else {
-                        listContainer.innerHTML = result.records.map(record => `
+                        // 최신 10개만 표시 (내림차순 정렬)
+                        const recentRecords = [...result.records].reverse().slice(0, 10);
+                        listContainer.innerHTML = recentRecords.map(record => `
                             <div class="time-record-item">
                                 <div>
                                     <div class="time-record-time">${record.koreanTime}</div>
@@ -308,8 +342,155 @@
             await originalSaveCurrentTime();
             setTimeout(() => {
                 loadTimeRecords();
+                updateChart(); // 저장 후 그래프도 업데이트
             }, 500); // 저장 후 0.5초 후 목록 새로고침
         };
+
+        // 그래프 관련 변수
+        let bondYieldChart = null;
+
+        // 그래프 초기화 함수
+        function initChart() {
+            const ctx = document.getElementById('bondYieldChart').getContext('2d');
+            bondYieldChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '국채 금리',
+                        data: [],
+                        borderColor: '#f7931a',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0,
+                        pointBackgroundColor: '#f7931a',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: '#f7931a',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `금리: ${context.parsed.y}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '날짜',
+                                color: '#666',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                color: '#666',
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '금리 (%)',
+                                color: '#666',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                color: '#666',
+                                callback: function(value) {
+                                    return value.toFixed(3) + '%';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        // 날짜 포맷 함수 (25/12/1 형태)
+        function formatDateForChart(dateStr) {
+            const date = new Date(dateStr);
+            const year = date.getFullYear().toString().slice(-2); // 25
+            const month = (date.getMonth() + 1).toString(); // 12
+            const day = date.getDate().toString(); // 1
+            return `${year}/${month}/${day}`;
+        }
+
+        // 그래프 데이터 업데이트 함수
+        async function updateChart() {
+            try {
+                const response = await fetch('/api/time-records');
+                const result = await response.json();
+                
+                if (result.success && result.records) {
+                    const records = result.records.filter(record => record.bondYield && record.timestamp);
+                    
+                    // 날짜순으로 정렬 (오름차순)
+                    records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    
+                    const labels = records.map(record => formatDateForChart(record.timestamp));
+                    const data = records.map(record => record.bondYield);
+                    
+                    if (bondYieldChart) {
+                        bondYieldChart.data.labels = labels;
+                        bondYieldChart.data.datasets[0].data = data;
+                        bondYieldChart.update();
+                    } else {
+                        initChart();
+                        bondYieldChart.data.labels = labels;
+                        bondYieldChart.data.datasets[0].data = data;
+                        bondYieldChart.update();
+                    }
+                }
+            } catch (error) {
+                console.error('그래프 업데이트 실패:', error);
+            }
+        }
+
+        // 페이지 로드 시 그래프 초기화 및 데이터 로드
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            updateChart();
+        });
     </script>
 </body>
 </html>
