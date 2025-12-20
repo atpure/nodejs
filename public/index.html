@@ -73,16 +73,113 @@
             font-weight: bold;
             color: #555;
         }
+        .time-record-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .time-record-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+        .time-record-btn:active {
+            transform: translateY(0);
+        }
+        .time-record-btn.success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+        .time-message {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #666;
+            min-height: 20px;
+        }
+        .time-records-section {
+            margin-top: 30px;
+            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .time-records-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 2px solid #f7931a;
+            padding-bottom: 8px;
+        }
+        .time-record-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            margin-bottom: 8px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .time-record-time {
+            font-weight: 600;
+            color: #333;
+        }
+        .time-record-id {
+            font-size: 0.75rem;
+            color: #999;
+            font-family: monospace;
+        }
+        .no-records {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            padding: 20px;
+        }
+        .refresh-btn {
+            background: #f7931a;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: background 0.3s ease;
+        }
+        .refresh-btn:hover {
+            background: #e8850f;
+        }
     </style>
 </head>
 <body>
     <div class="card">
-        <h1>가상화폐 실시간 시세</h1>
+        <h1>가상화폐 실시간 시세 & 국채 금리</h1>
         <div id="price-container">
             <div class="loading-spinner"></div>
             <p>정보를 가져오는 중...</p>
         </div>
         <p class="updated-at" id="update-time"></p>
+        <button class="time-record-btn" id="timeRecordBtn" onclick="saveCurrentTime()">
+            10년물 국채 금리 저장하기
+        </button>
+        <div class="time-message" id="timeMessage"></div>
+        
+        <div class="time-records-section">
+            <button class="refresh-btn" onclick="loadTimeRecords()">새로고침</button>
+            <div class="time-records-title">저장된 시간 기록 (최근 10개)</div>
+            <div id="timeRecordsList">
+                <div class="no-records">데이터를 불러오는 중...</div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -125,6 +222,94 @@
 
         updatePrice();
         setInterval(updatePrice, 60000); // 1분마다 갱신
+
+        async function saveCurrentTime() {
+            const btn = document.getElementById('timeRecordBtn');
+            const message = document.getElementById('timeMessage');
+            
+            // 버튼 비활성화 및 로딩 상태 표시
+            btn.disabled = true;
+            btn.textContent = '저장 중...';
+            message.textContent = '';
+            
+            try {
+                const response = await fetch('/api/time-record', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 성공 상태 표시
+                    btn.classList.add('success');
+                    btn.textContent = '✓ 저장 완료';
+                    message.textContent = `${result.time}에 저장되었습니다 (ID: ${result.id})`;
+                    message.style.color = '#4CAF50';
+                    
+                    // 3초 후 원래 상태로 복귀
+                    setTimeout(() => {
+                        btn.classList.remove('success');
+                        btn.textContent = '10년물 국채 금리 저장하기';
+                        btn.disabled = false;
+                        message.textContent = '';
+                    }, 3000);
+                } else {
+                    throw new Error(result.error || '저장 실패');
+                }
+            } catch (error) {
+                // 에러 상태 표시
+                btn.textContent = '다시 시도';
+                message.textContent = `저장 실패: ${error.message}`;
+                message.style.color = '#f44336';
+                btn.disabled = false;
+            }
+        }
+
+        // 시간 기록 로드 함수
+        async function loadTimeRecords() {
+            const listContainer = document.getElementById('timeRecordsList');
+            
+            try {
+                listContainer.innerHTML = '<div class="no-records">데이터를 불러오는 중...</div>';
+                
+                const response = await fetch('/api/time-records');
+                const result = await response.json();
+                
+                if (result.success && result.records) {
+                    if (result.records.length === 0) {
+                        listContainer.innerHTML = '<div class="no-records">저장된 기록이 없습니다</div>';
+                    } else {
+                        listContainer.innerHTML = result.records.map(record => `
+                            <div class="time-record-item">
+                                <div>
+                                    <div class="time-record-time">${record.koreanTime}</div>
+                                    ${record.bondYield ? `<div style="color: #f7931a; font-weight: bold; margin-top: 5px;">${record.bondYield}%</div>` : ''}
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                } else {
+                    throw new Error(result.error || '데이터 로드 실패');
+                }
+            } catch (error) {
+                listContainer.innerHTML = `<div class="no-records" style="color: #f44336;">로드 실패: ${error.message}</div>`;
+            }
+        }
+
+        // 페이지 로드 시 시간 기록 불러오기
+        loadTimeRecords();
+        
+        // 시간 저장 후 목록 새로고침
+        const originalSaveCurrentTime = saveCurrentTime;
+        saveCurrentTime = async function() {
+            await originalSaveCurrentTime();
+            setTimeout(() => {
+                loadTimeRecords();
+            }, 500); // 저장 후 0.5초 후 목록 새로고침
+        };
     </script>
 </body>
 </html>
